@@ -1,28 +1,37 @@
+import os
 import asyncio
-from playwright.async_api import async_playwright
+from dotenv import load_dotenv
+from browser_use.agent.service import Agent
+from browser_use.controller.service import Controller
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-async def run():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
-        context = await browser.new_context()
-        page = await context.new_page()
-        
-        await page.goto("https://qp-genie.azurewebsites.net/")
-        
-        await page.fill('input[name="username"]', "admin@synergech.com")
-        await page.fill('input[name="password"]', "admin")
-        
-        await page.click('button[type="submit"]')
-        
-        await page.wait_for_timeout(3000)  # simulate wait
-        content = await page.content()
-        
-        if "Dashboard" in content or "Genie AI" in content:
-            print("Login successful.")
-        else:
-            print("Login failed or still on login page.")
+# Load API Key from .env
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
 
-        await browser.close()
+# Set up LLM and Controller
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-exp", google_api_key=api_key)
+controller = Controller()
 
-# Run the script
-asyncio.run(run())
+# Define user story (now called task_description)
+task_description = """
+Go to https://www.google.com,
+search for 'Playwright Python',
+click the first result,
+confirm the page title contains 'Playwright'.
+"""
+
+async def main():
+    # Use correct keyword: task_description
+    agent = Agent(task_description, llm=llm, controller=controller, use_vision=False)
+    history = await agent.run()
+    
+    print("\n--- Execution Logs ---")
+    for action in history.action_results():
+        print(action)
+
+    print("\n--- Final Result ---")
+    print(history.final_result())
+
+if __name__ == "__main__":
+    asyncio.run(main())
